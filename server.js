@@ -20,22 +20,19 @@ const anthropic = new Anthropic({
 
 // OAuth2 client setup for Calendar (uses nmarbach@gmail.com)
 function getCalendarAuth() {
-  const credentials = require('./credentials.json');
-  const { client_secret, client_id, redirect_uris } = credentials.web || credentials.installed;
-
   const oAuth2Client = new google.auth.OAuth2(
-    client_id,
-    client_secret,
-    redirect_uris[0]
+    process.env.GOOGLE_CLIENT_ID,
+    process.env.GOOGLE_CLIENT_SECRET,
+    process.env.GOOGLE_REDIRECT_URI
   );
 
-  try {
-    const token = require('./token.json');
-    oAuth2Client.setCredentials(token);
-  } catch (error) {
-    console.error('Token not found. Please run setup-calendar.js');
-    throw new Error('Calendar not authorized');
-  }
+  // Set credentials from environment variables
+  oAuth2Client.setCredentials({
+    access_token: process.env.GOOGLE_ACCESS_TOKEN,
+    refresh_token: process.env.GOOGLE_REFRESH_TOKEN,
+    scope: 'https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/calendar.events',
+    token_type: 'Bearer'
+  });
 
   return oAuth2Client;
 }
