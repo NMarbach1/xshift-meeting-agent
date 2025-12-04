@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meeting Invite Agent</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+            max-width: 600px;
+            width: 100%;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        input, select, textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+            font-family: inherit;
+        }
+
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        button {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .result {
+            margin-top: 20px;
+            padding: 20px;
+            border-radius: 8px;
+            display: none;
+        }
+
+        .result.success {
+            background: #d4edda;
+            border: 2px solid #c3e6cb;
+            color: #155724;
+        }
+
+        .result.error {
+            background: #f8d7da;
+            border: 2px solid #f5c6cb;
+            color: #721c24;
+        }
+
+        .result h3 {
+            margin-bottom: 10px;
+            font-size: 18px;
+        }
+
+        .result p {
+            margin-bottom: 8px;
+            line-height: 1.6;
+        }
+
+        .meet-link {
+            background: white;
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 10px;
+            word-break: break-all;
+            font-family: monospace;
+            font-size: 12px;
+        }
+
+        .email-preview {
+            background: white;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 10px;
+            max-height: 200px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .required {
+            color: #e74c3c;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Meeting Invite Agent</h1>
+        <p class="subtitle">Send personalized meeting invites with Google Meet links</p>
+
+        <form id="inviteForm">
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="firstName">First Name <span class="required">*</span></label>
+                    <input type="text" id="firstName" name="firstName" required placeholder="John">
+                </div>
+                <div class="form-group">
+                    <label for="lastName">Last Name <span class="required">*</span></label>
+                    <input type="text" id="lastName" name="lastName" required placeholder="Smith">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="recipientEmail">Recipient Email <span class="required">*</span></label>
+                <input type="email" id="recipientEmail" name="recipientEmail" required placeholder="john.smith@example.com">
+            </div>
+
+            <div class="form-group">
+                <label>Send From</label>
+                <input type="text" value="XShift (contact@xshift.ai)" disabled style="background: #f5f5f5; color: #666;">
+            </div>
+
+            <div class="form-group">
+                <label for="company">Company Name <span class="required">*</span></label>
+                <input type="text" id="company" name="company" required placeholder="e.g., ABC Restaurant Group">
+            </div>
+
+            <div class="form-group">
+                <label for="industry">Industry <span class="required">*</span></label>
+                <select id="industry" name="industry" required>
+                    <option value="">Select industry...</option>
+                    <option value="restaurant">Restaurant / Food Service</option>
+                    <option value="retail">Retail</option>
+                    <option value="healthcare">Healthcare</option>
+                    <option value="manufacturing">Manufacturing</option>
+                    <option value="callcenter">Call Center</option>
+                    <option value="hospitality">Hospitality / Hotels</option>
+                    <option value="other">Other</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="employeeCount">Number of Employees <span class="required">*</span></label>
+                <select id="employeeCount" name="employeeCount" required>
+                    <option value="">Select range...</option>
+                    <option value="5-20">5-20 employees</option>
+                    <option value="21-50">21-50 employees</option>
+                    <option value="51-100">51-100 employees</option>
+                    <option value="101-500">101-500 employees</option>
+                    <option value="500+">500+ employees</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="painPoints">Current Scheduling Challenges <span class="required">*</span></label>
+                <textarea id="painPoints" name="painPoints" required placeholder="e.g., Spending 10+ hours weekly on manual schedules, frequent no-shows, employees constantly requesting shift swaps, difficult to track overtime..."></textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="currentMethod">How do you currently manage schedules?</label>
+                <select id="currentMethod" name="currentMethod">
+                    <option value="">Select method...</option>
+                    <option value="excel">Excel / Google Sheets</option>
+                    <option value="paper">Paper schedules</option>
+                    <option value="other-software">Other scheduling software</option>
+                    <option value="mix">Mix of methods</option>
+                    <option value="none">No formal system</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="meetingDate">Meeting Date <span class="required">*</span></label>
+                <input type="date" id="meetingDate" name="meetingDate" required>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="meetingTime">Meeting Time <span class="required">*</span></label>
+                    <input type="text" id="meetingTime" name="meetingTime" required placeholder="e.g., 2:00, 10:30">
+                </div>
+                <div class="form-group">
+                    <label for="ampm">AM/PM <span class="required">*</span></label>
+                    <select id="ampm" name="ampm" required>
+                        <option value="AM">AM</option>
+                        <option value="PM">PM</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="timezone">Timezone <span class="required">*</span></label>
+                <select id="timezone" name="timezone" required>
+                    <option value="America/New_York">Eastern Time (ET)</option>
+                    <option value="America/Chicago">Central Time (CT)</option>
+                    <option value="America/Denver">Mountain Time (MT)</option>
+                    <option value="America/Los_Angeles">Pacific Time (PT)</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="additionalNotes">Additional Context</label>
+                <textarea id="additionalNotes" name="additionalNotes" placeholder="Any other details that would help us personalize the conversation..."></textarea>
+            </div>
+
+            <button type="submit">Send Meeting Confirmation</button>
+        </form>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p style="margin-top: 15px; color: #667eea; font-weight: 600;">Sending invite...</p>
+        </div>
+
+        <div class="result" id="result"></div>
+    </div>
+
+    <script>
+        document.getElementById('inviteForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const formData = {
+                firstName: document.getElementById('firstName').value,
+                lastName: document.getElementById('lastName').value,
+                recipientEmail: document.getElementById('recipientEmail').value,
+                company: document.getElementById('company').value,
+                industry: document.getElementById('industry').value,
+                employeeCount: document.getElementById('employeeCount').value,
+                painPoints: document.getElementById('painPoints').value,
+                currentMethod: document.getElementById('currentMethod').value,
+                meetingDate: document.getElementById('meetingDate').value,
+                meetingTime: document.getElementById('meetingTime').value,
+                ampm: document.getElementById('ampm').value,
+                timezone: document.getElementById('timezone').value,
+                additionalNotes: document.getElementById('additionalNotes').value
+            };
+
+            const resultDiv = document.getElementById('result');
+            const loadingDiv = document.getElementById('loading');
+            const submitButton = e.target.querySelector('button[type="submit"]');
+
+            // Show loading
+            resultDiv.style.display = 'none';
+            loadingDiv.style.display = 'block';
+            submitButton.disabled = true;
+
+            try {
+                const response = await fetch('/send-invite', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(formData)
+                });
+
+                const data = await response.json();
+
+                loadingDiv.style.display = 'none';
+                resultDiv.style.display = 'block';
+
+                if (data.success) {
+                    resultDiv.className = 'result success';
+                    resultDiv.innerHTML = `
+                        <h3>✓ Meeting Invite Sent!</h3>
+                        <p><strong>Sent to:</strong> ${formData.recipientEmail}</p>
+                        <p><strong>From:</strong> XShift (contact@xshift.ai)</p>
+                        <p><strong>Google Meet Link:</strong></p>
+                        <div class="meet-link">${data.meetLink}</div>
+                        <p style="margin-top: 15px;"><strong>Email Preview:</strong></p>
+                        <div class="email-preview">${data.emailPreview}</div>
+                    `;
+
+                    // Reset form
+                    e.target.reset();
+                } else {
+                    throw new Error(data.error || 'Unknown error');
+                }
+
+            } catch (error) {
+                loadingDiv.style.display = 'none';
+                resultDiv.style.display = 'block';
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = `
+                    <h3>✗ Error</h3>
+                    <p>${error.message}</p>
+                `;
+            } finally {
+                submitButton.disabled = false;
+            }
+        });
+    </script>
+</body>
+</html>
