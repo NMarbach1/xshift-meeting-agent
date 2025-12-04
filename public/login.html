@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - XShift Meeting Agent</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .login-container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 40px;
+            max-width: 400px;
+            width: 100%;
+        }
+
+        .logo {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .logo h1 {
+            font-size: 28px;
+            color: #333;
+            margin-bottom: 8px;
+        }
+
+        .logo p {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 15px;
+            transition: border-color 0.3s;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        button {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .error-message {
+            background: #fee;
+            color: #c33;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            display: none;
+        }
+
+        .success-message {
+            background: #efe;
+            color: #3c3;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            display: none;
+        }
+
+        .qr-code-container {
+            text-align: center;
+            margin: 20px 0;
+            display: none;
+        }
+
+        .qr-code-container img {
+            max-width: 250px;
+            margin: 20px auto;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 10px;
+            background: white;
+        }
+
+        .setup-instructions {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            font-size: 13px;
+            color: #555;
+            line-height: 1.6;
+        }
+
+        .setup-instructions ol {
+            margin-left: 20px;
+            margin-top: 10px;
+        }
+
+        .setup-instructions li {
+            margin-bottom: 8px;
+        }
+
+        #mfaField {
+            display: none;
+        }
+
+        .lock-icon {
+            text-align: center;
+            font-size: 48px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="logo">
+            <div class="lock-icon">🔐</div>
+            <h1>XShift Meeting Agent</h1>
+            <p>Secure Login</p>
+        </div>
+
+        <div id="errorMessage" class="error-message"></div>
+        <div id="successMessage" class="success-message"></div>
+
+        <!-- Login Form -->
+        <form id="loginForm">
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" required autocomplete="current-password">
+            </div>
+
+            <div class="form-group" id="mfaField">
+                <label for="mfaCode">MFA Code (from Authenticator App)</label>
+                <input type="text" id="mfaCode" name="mfaCode" placeholder="000000" maxlength="6" pattern="[0-9]{6}" inputmode="numeric">
+            </div>
+
+            <button type="submit" id="loginButton">Login</button>
+        </form>
+
+        <!-- MFA Setup (shown on first login) -->
+        <div id="mfaSetup" style="display: none;">
+            <div class="setup-instructions">
+                <strong>🔒 Setup Two-Factor Authentication (MFA)</strong>
+                <ol>
+                    <li>Download an authenticator app (Google Authenticator, Authy, Microsoft Authenticator)</li>
+                    <li>Scan the QR code below with your authenticator app</li>
+                    <li>Enter the 6-digit code from the app to complete setup</li>
+                </ol>
+            </div>
+
+            <div class="qr-code-container" id="qrCodeContainer">
+                <img id="qrCodeImage" src="" alt="MFA QR Code">
+                <p style="font-size: 12px; color: #666; margin-top: 10px;">
+                    Secret: <code id="secretKey" style="background: #f0f0f0; padding: 4px 8px; border-radius: 4px;"></code>
+                </p>
+            </div>
+
+            <div class="form-group">
+                <label for="setupMfaCode">Enter 6-digit code from your app</label>
+                <input type="text" id="setupMfaCode" placeholder="000000" maxlength="6" pattern="[0-9]{6}" inputmode="numeric" required>
+            </div>
+
+            <button id="verifyMfaButton">Complete Setup</button>
+        </div>
+    </div>
+
+    <script>
+        const loginForm = document.getElementById('loginForm');
+        const loginButton = document.getElementById('loginButton');
+        const mfaField = document.getElementById('mfaField');
+        const mfaSetup = document.getElementById('mfaSetup');
+        const qrCodeContainer = document.getElementById('qrCodeContainer');
+        const errorMessage = document.getElementById('errorMessage');
+        const successMessage = document.getElementById('successMessage');
+
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorMessage.style.display = 'block';
+            successMessage.style.display = 'none';
+        }
+
+        function showSuccess(message) {
+            successMessage.textContent = message;
+            successMessage.style.display = 'block';
+            errorMessage.style.display = 'none';
+        }
+
+        function hideMessages() {
+            errorMessage.style.display = 'none';
+            successMessage.style.display = 'none';
+        }
+
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            hideMessages();
+
+            const password = document.getElementById('password').value;
+            const mfaCode = document.getElementById('mfaCode').value;
+
+            loginButton.disabled = true;
+            loginButton.textContent = 'Logging in...';
+
+            try {
+                const response = await fetch('/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password, mfaCode })
+                });
+
+                const data = await response.json();
+
+                if (data.setupRequired) {
+                    // MFA setup needed
+                    showSetupMFA(password);
+                } else if (data.success) {
+                    showSuccess('Login successful! Redirecting...');
+                    setTimeout(() => window.location.href = '/', 1000);
+                } else {
+                    showError(data.error || 'Login failed');
+                }
+            } catch (error) {
+                showError('Network error. Please try again.');
+            } finally {
+                loginButton.disabled = false;
+                loginButton.textContent = 'Login';
+            }
+        });
+
+        async function showSetupMFA(password) {
+            try {
+                const response = await fetch('/setup-mfa', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password })
+                });
+
+                const data = await response.json();
+
+                if (data.qrCode) {
+                    loginForm.style.display = 'none';
+                    mfaSetup.style.display = 'block';
+                    qrCodeContainer.style.display = 'block';
+                    document.getElementById('qrCodeImage').src = data.qrCode;
+                    document.getElementById('secretKey').textContent = data.secret;
+                }
+            } catch (error) {
+                showError('Failed to setup MFA. Please try again.');
+            }
+        }
+
+        document.getElementById('verifyMfaButton').addEventListener('click', async () => {
+            const setupMfaCode = document.getElementById('setupMfaCode').value;
+
+            if (setupMfaCode.length !== 6) {
+                showError('Please enter a 6-digit code');
+                return;
+            }
+
+            try {
+                const response = await fetch('/verify-setup-mfa', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ token: setupMfaCode })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showSuccess('MFA setup complete! You will need to save the MFA_SECRET to your environment variables. Redirecting...');
+                    setTimeout(() => window.location.href = '/', 2000);
+                } else {
+                    showError(data.error || 'Invalid code. Please try again.');
+                }
+            } catch (error) {
+                showError('Network error. Please try again.');
+            }
+        });
+
+        // Auto-show MFA field if trying to login
+        document.getElementById('password').addEventListener('input', () => {
+            mfaField.style.display = 'block';
+        });
+    </script>
+</body>
+</html>

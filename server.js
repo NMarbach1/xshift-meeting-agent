@@ -3,10 +3,26 @@ const path = require('path');
 const { google } = require('googleapis');
 const Anthropic = require('@anthropic-ai/sdk');
 const nodemailer = require('nodemailer');
+const session = require('express-session');
+const speakeasy = require('speakeasy');
+const QRCode = require('qrcode');
+const bcrypt = require('bcryptjs');
 require('dotenv').config();
 
 const app = express();
 const PORT = 3000;
+
+// Session middleware
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'xshift-meeting-agent-secret-change-in-production',
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: process.env.NODE_ENV === 'production', // HTTPS only in production
+    httpOnly: true,
+    maxAge: 24 * 60 * 60 * 1000 // 24 hours
+  }
+}));
 
 // Middleware
 app.use(express.json());
@@ -205,12 +221,120 @@ async function sendMeetingInvite(recipientData) {
   };
 }
 
+// Authentication middleware
+function requireAuth(req, res, next) {
+  if (req.session && req.session.authenticated) {
+    return next();
+  }
+  res.redirect('/login');
+}
+
 // Routes
-app.get('/', (req, res) => {
+// Login page
+app.get('/login', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'login.html'));
+});
+
+// Setup MFA (first time only)
+app.post('/setup-mfa', async (req, res) => {
+  const { password } = req.body;
+
+  // Check if password matches
+  const correctPassword = process.env.ADMIN_PASSWORD;
+  if (!correctPassword || password !== correctPassword) {
+    return res.status(401).json({ error: 'Invalid password' });
+  }
+
+  // Generate MFA secret
+  const secret = speakeasy.generateSecret({
+    name: 'XShift Meeting Agent (xshift.me)'
+  });
+
+  // Generate QR code
+  const qrCodeUrl = await QRCode.toDataURL(secret.otpauth_url);
+
+  // Store secret in session temporarily
+  req.session.tempMfaSecret = secret.base32;
+
+  res.json({
+    qrCode: qrCodeUrl,
+    secret: secret.base32
+  });
+});
+
+// Verify MFA and complete setup
+app.post('/verify-setup-mfa', (req, res) => {
+  const { token } = req.body;
+  const secret = req.session.tempMfaSecret;
+
+  if (!secret) {
+    return res.status(400).json({ error: 'MFA setup not initiated' });
+  }
+
+  const verified = speakeasy.totp.verify({
+    secret: secret,
+    encoding: 'base32',
+    token: token,
+    window: 2
+  });
+
+  if (verified) {
+    // Store the MFA secret (in production, store in database)
+    req.session.mfaSecret = secret;
+    req.session.mfaEnabled = true;
+    req.session.authenticated = true;
+    delete req.session.tempMfaSecret;
+
+    res.json({ success: true, message: 'MFA setup complete!' });
+  } else {
+    res.status(401).json({ error: 'Invalid MFA code' });
+  }
+});
+
+// Login with MFA
+app.post('/login', async (req, res) => {
+  const { password, mfaCode } = req.body;
+
+  // Check password
+  const correctPassword = process.env.ADMIN_PASSWORD;
+  if (!correctPassword || password !== correctPassword) {
+    return res.status(401).json({ error: 'Invalid password' });
+  }
+
+  // Check if MFA is set up
+  const mfaSecret = process.env.MFA_SECRET;
+  if (!mfaSecret) {
+    return res.json({ setupRequired: true, message: 'MFA setup required' });
+  }
+
+  // Verify MFA code
+  const verified = speakeasy.totp.verify({
+    secret: mfaSecret,
+    encoding: 'base32',
+    token: mfaCode,
+    window: 2
+  });
+
+  if (verified) {
+    req.session.authenticated = true;
+    res.json({ success: true });
+  } else {
+    res.status(401).json({ error: 'Invalid MFA code' });
+  }
+});
+
+// Logout
+app.post('/logout', (req, res) => {
+  req.session.destroy();
+  res.json({ success: true });
+});
+
+// Protected routes
+app.get('/', requireAuth, (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-app.post('/send-invite', async (req, res) => {
+app.post('/send-invite', requireAuth, async (req, res) => {
   try {
     const { firstName, lastName, recipientEmail, company, industry, employeeCount, painPoints, meetingDate, meetingTime, ampm, timezone } = req.body;
 
