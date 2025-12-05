@@ -7,6 +7,7 @@ const session = require('express-session');
 const speakeasy = require('speakeasy');
 const QRCode = require('qrcode');
 const bcrypt = require('bcryptjs');
+const fs = require('fs');
 require('dotenv').config();
 
 const app = express();
@@ -27,7 +28,6 @@ app.use(session({
 // Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(express.static('public'));
 
 // Initialize Claude API
 const anthropic = new Anthropic({
@@ -226,23 +226,37 @@ function requireAuth(req, res, next) {
   if (req.session && req.session.authenticated) {
     return next();
   }
-  res.redirect('/login');
+  // Serve login page instead of redirecting
+  res.sendFile(path.join(__dirname, 'public', 'login.html'));
 }
 
 // Routes
-// Login page
+// Main page is login
+app.get('/', (req, res) => {
+  // If already authenticated, redirect to form
+  if (req.session && req.session.authenticated) {
+    return res.redirect('/form');
+  }
+  res.sendFile(path.join(__dirname, 'public', 'login.html'));
+});
+
+// Login page (same as /)
 app.get('/login', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'login.html'));
 });
 
-// Setup MFA (first time only)
-app.post('/setup-mfa', async (req, res) => {
-  const { password } = req.body;
+// Force logout (for testing)
+app.get('/logout', (req, res) => {
+  req.session.destroy();
+  res.redirect('/');
+});
 
-  // Check if password matches
-  const correctPassword = process.env.ADMIN_PASSWORD;
-  if (!correctPassword || password !== correctPassword) {
-    return res.status(401).json({ error: 'Invalid password' });
+// Setup MFA (first time only - no password needed)
+app.post('/setup-mfa', async (req, res) => {
+  // Check if MFA is already set up
+  const mfaSecret = process.env.MFA_SECRET;
+  if (mfaSecret) {
+    return res.status(400).json({ error: 'MFA already configured' });
   }
 
   // Generate MFA secret
@@ -279,32 +293,38 @@ app.post('/verify-setup-mfa', (req, res) => {
   });
 
   if (verified) {
-    // Store the MFA secret (in production, store in database)
+    // Save MFA secret to .env file
+    const envPath = path.join(__dirname, '.env');
+    const envContent = fs.readFileSync(envPath, 'utf8');
+    const updatedEnv = envContent.replace(/MFA_SECRET=.*/, `MFA_SECRET=${secret}`);
+    fs.writeFileSync(envPath, updatedEnv);
+
+    // Update process.env
+    process.env.MFA_SECRET = secret;
+
     req.session.mfaSecret = secret;
     req.session.mfaEnabled = true;
     req.session.authenticated = true;
     delete req.session.tempMfaSecret;
 
-    res.json({ success: true, message: 'MFA setup complete!' });
+    res.json({ success: true, message: 'MFA setup complete! Secret saved to .env file.' });
   } else {
     res.status(401).json({ error: 'Invalid MFA code' });
   }
 });
 
-// Login with MFA
+// Login with MFA only (no password)
 app.post('/login', async (req, res) => {
-  const { password, mfaCode } = req.body;
-
-  // Check password
-  const correctPassword = process.env.ADMIN_PASSWORD;
-  if (!correctPassword || password !== correctPassword) {
-    return res.status(401).json({ error: 'Invalid password' });
-  }
+  const { mfaCode } = req.body;
 
   // Check if MFA is set up
   const mfaSecret = process.env.MFA_SECRET;
   if (!mfaSecret) {
     return res.json({ setupRequired: true, message: 'MFA setup required' });
+  }
+
+  if (!mfaCode) {
+    return res.status(400).json({ error: 'MFA code required' });
   }
 
   // Verify MFA code
@@ -329,9 +349,16 @@ app.post('/logout', (req, res) => {
   res.json({ success: true });
 });
 
+// Static files (after login routes to prevent conflicts)
+app.use(express.static('public'));
+
 // Protected routes
-app.get('/', requireAuth, (req, res) => {
+app.get('/form', requireAuth, (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+app.get('/dashboard', requireAuth, (req, res) => {
+  res.redirect('/form');
 });
 
 app.post('/send-invite', requireAuth, async (req, res) => {
