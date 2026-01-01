@@ -320,7 +320,9 @@ app.post('/login', async (req, res) => {
   // Check if MFA is set up
   const mfaSecret = process.env.MFA_SECRET;
   if (!mfaSecret) {
-    return res.json({ setupRequired: true, message: 'MFA setup required' });
+    // MFA disabled - auto-authenticate
+    req.session.authenticated = true;
+    return res.json({ success: true, message: 'MFA disabled - logged in automatically' });
   }
 
   if (!mfaCode) {
