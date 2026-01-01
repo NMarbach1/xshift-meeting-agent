@@ -13,6 +13,9 @@ require('dotenv').config();
 const app = express();
 const PORT = 3000;
 
+// Trust Vercel proxy for secure cookies
+app.set('trust proxy', 1);
+
 // Session middleware
 app.use(session({
   secret: process.env.SESSION_SECRET || 'xshift-meeting-agent-secret-change-in-production',
